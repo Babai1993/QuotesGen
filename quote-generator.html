@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quotecraft — AI Quote Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1208;
+    --paper: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8d49a;
+    --rust: #8b3a2a;
+    --cream: #faf7f0;
+    --shadow: rgba(26,18,8,0.15);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(201,168,76,0.06) 28px, rgba(201,168,76,0.06) 29px),
+      repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(201,168,76,0.04) 28px, rgba(201,168,76,0.04) 29px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .noise {
+    position: fixed;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeDown 0.7s ease both;
+  }
+
+  .wordmark {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .wordmark span {
+    color: var(--gold);
+  }
+
+  .tagline {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #7a6a50;
+  }
+
+  .ornament {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+
+  .ornament-line {
+    height: 1px;
+    width: 60px;
+    background: linear-gradient(to right, transparent, var(--gold));
+  }
+
+  .ornament-line.rev {
+    background: linear-gradient(to left, transparent, var(--gold));
+  }
+
+  .ornament-diamond {
+    width: 6px;
+    height: 6px;
+    background: var(--gold);
+    transform: rotate(45deg);
+  }
+
+  /* Input card */
+  .card {
+    background: var(--cream);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 4px;
+    padding: 32px;
+    box-shadow: 0 4px 24px var(--shadow), inset 0 1px 0 rgba(255,255,255,0.8);
+    animation: fadeUp 0.7s 0.15s ease both;
+    margin-bottom: 32px;
+  }
+
+  label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: #7a6a50;
+    margin-bottom: 10px;
+  }
+
+  textarea {
+    width: 100%;
+    background: white;
+    border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 3px;
+    padding: 14px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    color: var(--ink);
+    resize: vertical;
+    min-height: 90px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+
+  textarea::placeholder { color: #bdb29a; }
+
+  textarea:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .select-wrap {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  select {
+    width: 100%;
+    appearance: none;
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c9a84c'/%3E%3C/svg%3E") no-repeat right 12px center;
+    border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 3px;
+    padding: 10px 32px 10px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select:focus { border-color: var(--gold); }
+
+  .btn {
+    padding: 11px 28px;
+    background: var(--ink);
+    color: var(--gold-light);
+    border: none;
+    border-radius: 3px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: #2e2416; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Quote display */
+  .quotes-section { animation: fadeUp 0.5s ease both; }
+
+  .section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: #7a6a50;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(201,168,76,0.3);
+  }
+
+  .quote-card {
+    background: var(--cream);
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 4px;
+    padding: 28px 32px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 12px var(--shadow);
+    position: relative;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .quote-card::before {
+    content: '\201C';
+    font-family: 'Playfair Display', serif;
+    font-size: 5rem;
+    color: var(--gold-light);
+    position: absolute;
+    top: 4px;
+    left: 18px;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .quote-text {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.05rem, 2.5vw, 1.22rem);
+    font-style: italic;
+    line-height: 1.65;
+    color: var(--ink);
+    padding-left: 12px;
+    margin-bottom: 16px;
+  }
+
+  .quote-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(201,168,76,0.2);
+    padding-top: 12px;
+  }
+
+  .quote-tag {
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: rgba(201,168,76,0.1);
+    padding: 3px 10px;
+    border-radius: 2px;
+  }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 3px;
+    padding: 5px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    color: #7a6a50;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    background: rgba(201,168,76,0.1);
+    border-color: var(--gold);
+    color: var(--ink);
+  }
+
+  .copy-btn.copied { color: var(--gold); border-color: var(--gold); }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 32px;
+    color: #7a6a50;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border: 2px solid rgba(201,168,76,0.3);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 10px;
+  }
+
+  /* Error */
+  .error {
+    background: #fff8f6;
+    border: 1px solid #e8c4bb;
+    border-radius: 4px;
+    padding: 14px 18px;
+    color: var(--rust);
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+  }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #bdb29a;
+    font-size: 0.9rem;
+    font-style: italic;
+  }
+
+  .empty-state .icon { font-size: 2rem; margin-bottom: 8px; display: block; }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="wrap">
+
+  <header>
+    <div class="wordmark">Quote<span>craft</span></div>
+    <div class="tagline">AI-Powered Quote Generator</div>
+    <div class="ornament">
+      <div class="ornament-line"></div>
+      <div class="ornament-diamond"></div>
+      <div class="ornament-line rev"></div>
+    </div>
+  </header>
+
+  <div class="card">
+    <label for="prompt">Your Prompt or Theme</label>
+    <textarea id="prompt" placeholder="e.g. resilience after failure, the beauty of solitude, chasing dreams at midnight…"></textarea>
+
+    <div class="controls">
+      <div class="select-wrap">
+        <label for="tone" style="margin-bottom:6px">Tone</label>
+        <select id="tone">
+          <option value="inspirational">Inspirational</option>
+          <option value="philosophical">Philosophical</option>
+          <option value="poetic">Poetic</option>
+          <option value="witty">Witty</option>
+          <option value="melancholic">Melancholic</option>
+          <option value="stoic">Stoic</option>
+          <option value="romantic">Romantic</option>
+          <option value="humorous">Humorous</option>
+        </select>
+      </div>
+      <div class="select-wrap">
+        <label for="count" style="margin-bottom:6px">Number of Quotes</label>
+        <select id="count">
+          <option value="1">1 Quote</option>
+          <option value="3" selected>3 Quotes</option>
+          <option value="5">5 Quotes</option>
+        </select>
+      </div>
+      <button class="btn" id="generateBtn" onclick="generateQuotes()">Generate</button>
+    </div>
+  </div>
+
+  <div id="output"></div>
+
+</div>
+
+<script>
+async function generateQuotes() {
+  const prompt = document.getElementById('prompt').value.trim();
+  const tone = document.getElementById('tone').value;
+  const count = parseInt(document.getElementById('count').value);
+  const output = document.getElementById('output');
+  const btn = document.getElementById('generateBtn');
+
+  if (!prompt) {
+    output.innerHTML = '<div class="error">Please enter a prompt or theme before generating.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  output.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div><br/>
+      Crafting your quotes…
+    </div>`;
+
+  const systemPrompt = `You are a masterful writer of quotes. Generate exactly ${count} original, memorable quote(s) based on the user's theme. Each quote should be ${tone} in tone. They must feel genuine, timeless, and thought-provoking — never clichéd.
+
+Respond ONLY with a valid JSON array. No preamble, no markdown, no explanation. Format:
+[
+  { "quote": "The quote text here." },
+  ...
+]`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: `Theme: ${prompt}` }]
+      })
+    });
+
+    const data = await res.json();
+    const raw = data.content?.find(b => b.type === "text")?.text || "[]";
+    const clean = raw.replace(/```json|```/g, "").trim();
+    const quotes = JSON.parse(clean);
+
+    if (!Array.isArray(quotes) || quotes.length === 0) throw new Error("No quotes returned");
+
+    output.innerHTML = `<div class="quotes-section"><div class="section-label">Generated Quotes</div></div>`;
+    const section = output.querySelector('.quotes-section');
+
+    quotes.forEach((q, i) => {
+      const card = document.createElement('div');
+      card.className = 'quote-card';
+      card.style.animationDelay = `${i * 0.1}s`;
+      card.innerHTML = `
+        <div class="quote-text">${escapeHtml(q.quote)}</div>
+        <div class="quote-meta">
+          <span class="quote-tag">${tone}</span>
+          <button class="copy-btn" onclick="copyQuote(this, ${JSON.stringify(q.quote)})">Copy</button>
+        </div>`;
+      section.appendChild(card);
+    });
+
+  } catch (err) {
+    output.innerHTML = `<div class="error">Something went wrong: ${err.message}. Please try again.</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function copyQuote(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generateQuotes(); }
+});
+</script>
+</body>
+</html>
